@@ -1,0 +1,260 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\Sym}{\Sigma}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\EQ}{\mathrm{EQ}}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\DeclareMathOperator{\sign}{sign}
+
+\title{\textbf{Sameness Requires a Product:\\ An Elementary Obstruction to Additive Matching}}
+\author{Fabian Franz\thanks{Independent researcher. Correspondence: \texttt{fabian@isomorphic-ai.com}. An authorship and AI-contribution statement appears at the end of this paper.}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Deciding whether two symbols are identical cannot be performed by scoring each symbol independently and adding the scores. We prove that, for any alphabet with at least two symbols, no additive readout can separate the matching pairs from the mismatching pairs: equality is logically equivalent to \textsc{xnor} over symbol identities. The obstruction is independent of the richness of the per-symbol representation and persists even for lossless features. Moreover, under the symmetric regularized loss studied here, the loss-optimal additive matcher is constant and has balanced accuracy exactly $\tfrac12$. In contrast, a single bilinear interaction between the two representations is already sufficient.
+\end{abstract}
+
+\section{The matching problem}
+\label{sec:problem}
+
+Many computations reduce to a single primitive: \emph{matching}. Given a current item and a memory of past items, find the past occurrences that are \emph{the same} as the current one. Copying a previously seen token, retrieving a value by its key, binding a variable to its earlier mention, and recognizing ``I have seen this before'' are all instances. The primitive is deceptively simple to state and, as we will see, subtly constrained in how it can be realized.
+
+We study the irreducible core of the primitive: given two symbols, output a high score when they are identical and a low score otherwise. The question we answer is structural --- not \emph{whether} a particular model matches well in practice, but \emph{what form} a model must have for exact matching to be possible at all. The answer is that the two symbols must \emph{interact}: they cannot be scored separately and combined by addition. The minimal sufficient interaction is a product. The main finite-dimensional claims are formalized and machine-checked in Lean~4 (Appendix~\ref{app:formalization}).
+
+\section{Definitions}
+\label{sec:defs}
+
+We assume no background beyond elementary linear algebra.
+
+\begin{definition}[Symbols and representations]
+Let $\Sym = \{1,\dots,V\}$ be a finite alphabet with $V \geq 2$ symbols. A \emph{representation} is a map $\varphi : \Sym \to \R^{d}$ assigning to each symbol a feature vector $\varphi(s)$. We call $\varphi$ \emph{injective} if distinct symbols receive distinct vectors, and \emph{one-hot} if $d = V$ and $\varphi(s) = e_{s}$, the $s$-th standard basis vector.
+\end{definition}
+
+\begin{definition}[Matching target]
+The \emph{equality predicate} is
+\[
+\EQ(q,k) \;=\;
+\begin{cases}
+1 & q = k,\\
+0 & q \neq k,
+\end{cases}
+\qquad q,k \in \Sym.
+\]
+Arranged as a $V \times V$ matrix, $\EQ$ is the identity matrix.
+\end{definition}
+
+\begin{definition}[Readouts]
+A \emph{readout} is a scoring function $m : \Sym \times \Sym \to \R$, turned into a classifier by a threshold $\tau$: predict \emph{match} iff $m(q,k) \geq \tau$. We single out two forms.
+\begin{itemize}
+\item[(A)] $m$ is \emph{additive} if $m(q,k) = a(q) + b(k)$ for some functions $a,b : \Sym \to \R$. This is the general shape of ``score each argument on its own, then add.'' Every \emph{linear} readout $m(q,k) = \inner{u}{\varphi(q)} + \inner{v}{\varphi(k)} + c$ is additive, with $a(q) = \inner{u}{\varphi(q)}$ and $b(k) = \inner{v}{\varphi(k)} + c$.
+\item[(B)] $m$ is \emph{bilinear} if $m(q,k) = \varphi(q)^{\top} W \, \varphi(k)$ for some matrix $W \in \R^{d \times d}$. This is the minimal form in which the two representations \emph{multiply}.
+\end{itemize}
+\end{definition}
+
+The reduction in (A) matters: \emph{any} additive readout over \emph{any} representation collapses to per-symbol scalars $a,b$. Whatever richness $\varphi$ carries is irrelevant to an additive readout, because the readout never combines the two arguments before summing. The obstruction below therefore needs no assumption on $\varphi$.
+
+\section{The obstruction: matching is \textsc{xnor}}
+\label{sec:impossibility}
+
+Equality of two symbols is the relation that is true exactly when the two arguments agree --- logical \textsc{xnor}. The following is the relabeled, identity-matrix instance of the classical fact that a single linear threshold cannot represent \textsc{xor}/\textsc{xnor} \cite{minsky1969}.
+
+\begin{theorem}[No errorless additive matcher]
+\label{thm:obstruction}
+Let $V \geq 2$. For every additive readout $m(q,k) = a(q) + b(k)$ and every threshold $\tau$, the induced classifier misclassifies at least one pair. Concretely, for every pair of distinct symbols $i \neq j$, the four pairs $(i,i),(j,j),(i,j),(j,i)$ cannot all be classified correctly by a single threshold.
+\end{theorem}
+
+\begin{proof}
+Fix $i \neq j$ and suppose all four were correct. The two diagonal pairs are positives and the two off-diagonal pairs are negatives, so
+\[
+m(i,i) \geq \tau, \quad m(j,j) \geq \tau, \quad m(i,j) < \tau, \quad m(j,i) < \tau .
+\]
+Adding the two inequalities on each side,
+\[
+m(i,i) + m(j,j) \;\geq\; 2\tau \;>\; m(i,j) + m(j,i).
+\]
+But additivity makes the two sums equal:
+\[
+m(i,i) + m(j,j) = a(i)+b(i)+a(j)+b(j) = a(i)+b(j)+a(j)+b(i) = m(i,j)+m(j,i),
+\]
+so the same quantity is both $\geq 2\tau$ and $< 2\tau$, a contradiction.
+\end{proof}
+
+\begin{remark}[The two-symbol case]
+Concretely, for two symbols the two matching scores $a(1)+b(1),\,a(2)+b(2)$ and the two mismatching scores $a(1)+b(2),\,a(2)+b(1)$ have equal sums. So no threshold can sit above both matches and below both mismatches: that would force the matching total strictly above the mismatching total, yet the two totals are equal.
+\end{remark}
+
+The argument uses neither the form of $\varphi$ nor the value of $\tau$: it is a property of the additive shape alone. Equality forces a relation between a \emph{pair} of symbols, while an additive score is a verdict on each symbol separately; the two cannot agree.
+
+One might hope that, while no additive readout is perfect, a \emph{trained} one --- fit to data with a lossless representation --- could at least be informative. Under a mild symmetry assumption, it is exactly the opposite.
+
+\begin{theorem}[The symmetric regularized additive matcher is exactly chance]
+\label{thm:chance}
+Let $V \geq 2$ and consider additive readouts $m(q,k) = a(q) + b(k) + c$. Let $\ell(z) = \log(1 + \exp(-z))$, and let $R_{\lambda}$ be the class-balanced logistic risk
+\[
+R_{\lambda}(a,b,c) = \frac{1}{2V}\sum_{q} \ell\bigl(m(q,q)\bigr) + \frac{1}{2V(V-1)}\sum_{q \neq k} \ell\bigl(-m(q,k)\bigr) + \frac{\lambda}{2}\Bigl(\sum_{s} a(s)^{2} + \sum_{s} b(s)^{2} + c^{2}\Bigr),
+\]
+with $\lambda > 0$. Then $R_{\lambda}$ has a unique minimizer, that minimizer has constant score $m(q,k)$, and every thresholded classifier built from this score has balanced accuracy exactly $\tfrac12$.
+\end{theorem}
+
+\begin{proof}
+Each loss term is convex in $(a,b,c)$ --- a convex $\ell$ composed with the linear score --- and the $\tfrac{\lambda}{2}\lVert\cdot\rVert^{2}$ term is strictly convex, so $R_{\lambda}$ is strictly convex and coercive and has a unique minimizer. Both terms are invariant under any permutation $\sigma \in S_V$ acting simultaneously on the symbols and on the coordinates $(a,b)$: the data term because all diagonal pairs receive equal weight and all off-diagonal pairs receive equal weight, and the regularizer because it is a sum of squared coordinates over all symbols and is therefore unchanged by relabeling. Hence the unique minimizer is fixed by every $\sigma$, which forces $a(\cdot)$ and $b(\cdot)$ to be constant; the score $m(q,k)$ is therefore constant in $(q,k)$. A constant score emits a single label, so on the equality task one of the true-positive and true-negative rates is $1$ and the other $0$, giving balanced accuracy $\tfrac12$.
+\end{proof}
+
+\begin{remark}
+Theorem~\ref{thm:obstruction} says no additive matcher is perfect; Theorem~\ref{thm:chance} says the \emph{natural} one is maximally uninformative even with a perfect lookup table for a representation. The failure is located in the additive form, not in any poverty of the features --- the surprising part. (The symmetry hypothesis is what makes the optimum collapse cleanly to $\tfrac12$; without it an additive readout can exceed chance but, by Theorem~\ref{thm:obstruction}, never reach $1$.)
+\end{remark}
+
+\section{Sufficiency: one product is enough}
+\label{sec:sufficiency}
+
+A single multiplicative interaction removes the obstruction.
+
+\begin{theorem}[The identity operator matches]
+\label{thm:sufficiency}
+Let $\varphi$ map symbols to distinct unit vectors, $\lVert \varphi(s) \rVert = 1$. Let $\mu = \max_{i \neq j} \varphi(i)^{\top} \varphi(j)$ be the largest off-diagonal inner product. Then the bilinear readout $m(q,k) = \varphi(q)^{\top} \varphi(k)$ (i.e.\ $W = I$) classifies equality without error for every threshold $\tau \in (\mu, 1)$. For one-hot features $\mu = 0$, any $\tau \in (0,1)$ works, and the readout equals the identity matrix $\EQ$ exactly.
+\end{theorem}
+
+\begin{proof}
+For a diagonal pair, $m(q,q) = \lVert \varphi(q)\rVert^{2} = 1 \geq \tau$. For $i \neq j$, $m(i,j) = \varphi(i)^{\top}\varphi(j) \leq \mu < \tau$. Distinct unit vectors satisfy $\varphi(i)^{\top}\varphi(j) < 1$, so $\mu < 1$ and the interval $(\mu, 1)$ is nonempty.
+\end{proof}
+
+The reading is direct: the product $\varphi(q)^{\top}\varphi(k)$ scores \emph{alignment}, and ``same symbol'' is exactly ``maximal alignment.'' The single cross term $\sum_{r,s} W_{rs}\,\varphi(q)_r\,\varphi(k)_s$ supplies the pairwise interaction that the additive readout lacked.
+
+\begin{corollary}[Matching extends without new per-symbol parameters]
+\label{cor:generalize}
+Fix a threshold $\tau$. The identity matcher $m(q,k) = \varphi(q)^{\top}\varphi(k)$ continues to classify equality correctly on any enlarged symbol set whose unit feature vectors satisfy $\varphi(i)^{\top}\varphi(j) < \tau$ for all distinct $i,j$. Adding symbols thus requires only placing their features with sufficient separation; the matcher $W = I$ carries no per-symbol parameter and need not be retrained. A one-hot additive lookup matcher, by contrast, assigns separate coordinates $a(s), b(s)$ to each known symbol and has no canonical value for a new one; more generally, a feature-based additive rule still lacks the cross-argument term needed for exact matching.
+\end{corollary}
+
+This is the crux of why a multiplicative matcher is reusable: it parameterizes a \emph{relation} (alignment), not a \emph{lookup} (a value per symbol).
+
+\begin{remark}[Dimension and the alphabet]
+\label{rem:welch}
+Threshold matching depends only on the \emph{signed} separation $\mu = \max_{i \neq j} \varphi(i)^{\top}\varphi(j) < \tau$; large negative inner products are harmless for the hard-threshold classifier itself (they only make false positives less likely), and false positives are controlled by whether an off-diagonal score exceeds the chosen threshold. Keeping $\mu$ below a fixed $\tau < 1$ as the alphabet grows is a spherical-code constraint: in a fixed dimension $d$ only finitely many unit vectors can be pairwise $\tau$-separated, and that number grows with $d$. So the representation dimension must grow with the alphabet to maintain a fixed matching margin --- the capacity to distinguish ``how many different things'' is set by $d$ relative to $V$, not by the matcher. The stronger requirement of \emph{near-orthogonal} codes --- small \emph{absolute} coherence $\max_{i \neq j} \lvert \varphi(i)^{\top}\varphi(j)\rvert$ --- is governed, for $V > d$, by the Welch bound $\sqrt{(V-d)/(d(V-1))}$ \cite{welch1974}, but exact matching does not need it.
+\end{remark}
+
+\section{Relation to prior work}
+\label{sec:related}
+
+The obstruction of Section~\ref{sec:impossibility} is the equality-relation instance of the perceptron's inability to represent \textsc{xor}, the classical separability limitation of single linear threshold units \cite{minsky1969}. The benefit of multiplicative interactions over additive combination has been studied as a representational matter, from higher-order (sigma--pi) units to explicit multiplicative-interaction architectures \cite{jayakumar2020}. The same multiplicative character underlies outer-product associative memories and connectionist variable binding --- tensor-product binding \cite{smolensky1990} and holographic reduced representations \cite{plate1995} --- where two items are combined by a product rather than a sum. In modern sequence models the relevant product is the query--key score, a bilinear form $q^{\top} W k$ in the two token representations \cite{vaswani2017}, made explicit in the circuits view of attention \cite{elhage2021} and connected to in-context copying through induction heads \cite{olsson2022}. A line of interpretability work characterizes \emph{when} attention fires in terms of alignment of query and key features within low-rank subspaces \cite{lee2024qk, vit2024qk}; that picture is precisely the sufficiency direction here (Theorem~\ref{thm:sufficiency}), and the empirically near-identity query--key structure reported for copy-like heads is its canonical solution.
+
+Our contribution is not a new mechanism but a minimal statement: exact symbol matching \emph{is} \textsc{xnor}, hence unreachable by any additive readout independent of feature richness (Theorems~\ref{thm:obstruction}--\ref{thm:chance}), and reachable by a single bilinear term whose canonical realization is the identity and which generalizes across symbols (Theorem~\ref{thm:sufficiency}, Corollary~\ref{cor:generalize}). The role of dimension follows from a spherical-code argument (Remark~\ref{rem:welch}).
+
+\section{Implications}
+\label{sec:implications}
+
+\paragraph{Matching demands interaction.} Any system that must recognize ``the same as before'' --- content-addressable retrieval, copying, variable binding --- cannot score its two arguments independently and add. The two representations must be combined \emph{before} the verdict. This is a constraint on architecture, not on training.
+
+\paragraph{The product is the minimal interaction.} The constraint does not single out attention: a sufficiently deep nonlinear network applied to the \emph{concatenation} of the two representations can also compute equality, by universal approximation. What Section~\ref{sec:sufficiency} adds is \emph{minimality}: a single degree-two term, one matrix, already suffices, and its solution is the identity --- interpretable and content-addressable. This is a representational reason to prefer a multiplicative query--key score over folding both tokens into an MLP: it is the smallest interaction that does the job, and its canonical form is readable.
+
+\paragraph{An interpretability handle.} It follows that a learned exact-matching subcomputation must contain some cross-argument interaction; in the bilinear readout setting this appears as a multiplicative query--key term, whose canonical realization is near-identity (or, at lower rank, alignment within a subspace). ``This component matches'' should therefore be legible as a near-identity bilinear operator, without behavioral probing.
+
+\section{Open questions}
+\label{sec:open}
+
+\begin{enumerate}
+\item \textbf{Rank--margin trade-off.} Remark~\ref{rem:welch} frames the dimension--alphabet trade-off; what is the minimal rank of $W$ achieving $\varepsilon$-accurate matching of $V$ symbols in dimension $d$, and how does the achievable margin degrade with $V/d$?
+\item \textbf{Graded matching.} Real retrieval is soft: it scores \emph{similar}, not only \emph{identical}. For a graded target (a kernel rather than the identity), when does the additive obstruction relax, and how does the required interaction change?
+\item \textbf{Jointly learned features.} When $\varphi$ and $W$ are optimized together, the matching subspace need not be literal identity. Characterize the solution set; in particular when does learning route matching through a low-rank aligned subspace rather than the full identity?
+\item \textbf{Beyond pairs.} Some retrieval needs a \emph{conjunction} of features (match on two attributes at once). Does this demand interactions of degree higher than two, or can it be absorbed into the representation?
+\end{enumerate}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Sameness is not a property of one thing; it is a relation between two. An additive readout, which judges each thing on its own, is therefore blind to it: no choice of threshold and no richness of representation lets addition decide equality, and the loss-optimal additive matcher is exactly chance. A single product repairs this --- the identity operator on unit-norm features matches without error, carries no per-symbol parameter, and so extends to unseen symbols once their feature vectors preserve the separation bound. The operator that detects sameness is the identity, and matching is the inner product. This is, in miniature, why retrieval-like computation must multiply.
+
+\section*{Authorship and AI contribution}
+
+The work reported here was carried out by several AI systems under the direction
+and supervision of the human author. The central result was found and drafted by
+Claude Opus~4.8 (Anthropic) during an open-ended (``free'') turn, in response to
+a question posed in that context; Claude also wrote the manuscript and ran the
+numerical checks. The Lean~4 formalization was produced by GPT-5.5-Codex
+(OpenAI). The manuscript and its arguments were independently reviewed and
+critiqued by GPT-5.5 Pro Extended (OpenAI), Grok~4.3 (xAI), and Gemini~3.1~Pro
+(Google DeepMind), whose feedback corrected errors and sharpened several
+statements. The human author posed the questions, verified the mathematics, the
+references, and the Lean formalization, and takes full responsibility for the
+content, including any errors. Under present authorship conventions only humans
+are listed as authors.
+
+\appendix
+
+\section{Machine-checked formalization}
+\label{app:formalization}
+
+Theorems~\ref{thm:obstruction}, \ref{thm:chance}, and \ref{thm:sufficiency}, together with Corollary~\ref{cor:generalize}, have been formalized and machine-checked in Lean~4. The development establishes the additive obstruction (Theorem~\ref{thm:obstruction}), bilinear sufficiency and the coherence fact (Theorem~\ref{thm:sufficiency}), and --- for Theorem~\ref{thm:chance} --- the full statement for a concrete class-balanced, positive-$\ell^{2}$-regularized logistic risk: convexity, permutation invariance, strict convexity, and the existence and uniqueness of the minimizer are all derived from the risk definition, and at that minimizer the additive score is constant with finite equality-task balanced accuracy exactly $\tfrac12$. The source is available at \url{https://github.com/isomorphic-ai/transparent-ai/tree/main/equality-needs-multiplication/lean} (repository commit pending public release), built against Mathlib \texttt{v4.30.0} (commit \texttt{c5ea00351c28}). The principal formalized statements are \nolinkurl{no_additive_matcher} (Theorem~\ref{thm:obstruction}), \nolinkurl{identity_matches} (Theorem~\ref{thm:sufficiency}), and \nolinkurl{classBalanced_regularized_logistic_unique_minimizer_chance_all_thresholds} (Theorem~\ref{thm:chance}).
+
+\begin{thebibliography}{6 - attention-fires-on-alignment}
+
+\bibitem[1 - xor-not-separable]{minsky1969}
+M.~Minsky and S.~Papert.
+\emph{Perceptrons: An Introduction to Computational Geometry}.
+MIT Press, 1969.
+
+\bibitem[2 - attention-is-bilinear]{vaswani2017}
+A.~Vaswani, N.~Shazeer, N.~Parmar, J.~Uszkoreit, L.~Jones, A.~N.~Gomez, L.~Kaiser, and I.~Polosukhin.
+Attention is all you need.
+\emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2017.
+
+\bibitem[3 - qk-is-bilinear-form]{elhage2021}
+N.~Elhage, N.~Nanda, C.~Olsson, et al.
+A mathematical framework for transformer circuits.
+\emph{Transformer Circuits Thread}, Anthropic, 2021.
+
+\bibitem[4 - induction-heads-copy]{olsson2022}
+C.~Olsson, N.~Elhage, N.~Nanda, et al.
+In-context learning and induction heads.
+\emph{Transformer Circuits Thread}, Anthropic, 2022.
+
+\bibitem[5 - products-add-expressivity]{jayakumar2020}
+S.~M.~Jayakumar, W.~M.~Czarnecki, J.~Menick, et al.
+Multiplicative interactions and where to find them.
+\emph{International Conference on Learning Representations (ICLR)}, 2020.
+
+\bibitem[6 - attention-fires-on-alignment]{lee2024qk}
+A.~Lee, Y.~Belinkov, F.~Vi\'egas, and M.~Wattenberg.
+Decomposing query--key feature interactions using contrastive covariances.
+arXiv:2602.04752, 2026.
+
+\bibitem[7 - qk-interaction-low-rank]{vit2024qk}
+X.~Pan, A.~Philip, Z.~Xie, and O.~Schwartz.
+Dissecting query--key interaction in vision transformers.
+\emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2024. arXiv:2405.14880.
+
+\bibitem[8 - coherence-has-floor]{welch1974}
+L.~R.~Welch.
+Lower bounds on the maximum cross correlation of signals.
+\emph{IEEE Transactions on Information Theory}, 20(3):397--399, 1974.
+
+\bibitem[9 - tensor-product-binding]{smolensky1990}
+P.~Smolensky.
+Tensor product variable binding and the representation of symbolic structures in connectionist systems.
+\emph{Artificial Intelligence}, 46(1--2):159--216, 1990.
+
+\bibitem[10 - holographic-binding]{plate1995}
+T.~A.~Plate.
+Holographic reduced representations.
+\emph{IEEE Transactions on Neural Networks}, 6(3):623--641, 1995.
+
+\end{thebibliography}
+
+\end{document}
