@@ -1,0 +1,12 @@
+/.lake/
+/lake-packages/
+/.vscode/
+*.olean
+*.ilean
+*.c
+*.csp
+*.bc
+*.ll
+*.trace
+*.prof
+.DS_Store
